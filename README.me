@@ -4,3 +4,12 @@ packages:
 fastapi>=0.110
 uvicorn>=0.29
 requests>=2.31
+
+to test run: 
+
+>> uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+
+in a different tab
+>> ngrok http 8000
+
+then run the testing script (possible with different url).
