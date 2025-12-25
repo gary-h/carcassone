@@ -1,5 +1,7 @@
 import requests
 import time
+from PIL import Image
+from pathlib import Path
 
 BASE_URL = "https://viviana-unfeminine-bedazzlingly.ngrok-free.dev"
 
@@ -21,6 +23,7 @@ else:
     exit(1)
 
 # 2️⃣ Join two players
+print(game_id)
 player1 = requests.post(f"{BASE_URL}/games/{game_id}/join").json()["player_id"]
 player2 = requests.post(f"{BASE_URL}/games/{game_id}/join").json()["player_id"]
 players = [player1, player2]
@@ -28,24 +31,24 @@ print(f"Players joined: {players}")
 # 3️⃣ Simulate turns
 
 # Simple loop of 4 moves
+
+predefined_tile_moves = ["city_cap_with_straight", "city_cap_with_straight", "separator", "triple_city"]
+
 for turn in range(4):
     print("starting turn")
     current_player = players[turn % len(players)]
     # setting placements to the turn so that they don't overlap, eventually will check the legality
     move_data = {
-        "player_id": current_player,
-        "tile": f"T{turn+1}",
-        "x": turn,
-        "y": turn,
+        "tile_name": predefined_tile_moves[turn],
+        "pos": (turn,turn),
         "rotation": 0
     }
 
-    resp = requests.post(f"{BASE_URL}/moves/{game_id}/submit", json=move_data)
+    resp = requests.post(f"{BASE_URL}/games/{game_id}/move", json=move_data)
 
     if resp.status_code == 200:
         data = resp.json()
-        print(f"Turn {turn+1}: Player {current_player} moved. Game state:")
-        print(data["game"])
+        print(f"Turn {turn+1}: Player {current_player} moved.")
     else:
         try:
             error = resp.json()
@@ -55,3 +58,7 @@ for turn in range(4):
         print(f"Turn {turn+1}: Player {current_player} failed to move:", error)
 
     time.sleep(0.5)  # simulate small delay
+
+# get the final game
+draw_successful = requests.get(f"{BASE_URL}/games/{game_id}/draw").json()["img_saved"]
+print(f"draw succesful? {draw_successful}")
