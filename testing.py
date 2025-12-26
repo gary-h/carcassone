@@ -5,7 +5,6 @@ from pathlib import Path
 
 BASE_URL = "https://viviana-unfeminine-bedazzlingly.ngrok-free.dev"
 
-# 1. Create a game
 resp = requests.post(f"{BASE_URL}/games/create")
 print("Create response status:", resp.status_code)
 print("Raw response text:", resp.text)
@@ -21,17 +20,14 @@ else:
     print("Failed to create game")
     exit(1)
 
-# 2️⃣ Join two players
 print(game_id)
 player1 = requests.post(f"{BASE_URL}/games/{game_id}/join").json()["player_id"]
 player2 = requests.post(f"{BASE_URL}/games/{game_id}/join").json()["player_id"]
 players = [player1, player2]
 print(f"Players joined: {players}")
-# 3️⃣ Simulate turns
 
 # Simple loop of 4 moves
 
-predefined_tile_moves = ["city_cap_with_straight", "city_cap_with_straight", "separator", "triple_city"]
 
 for turn in range(4):
     print("starting turn")
@@ -43,7 +39,7 @@ for turn in range(4):
     current_player = players[(turn) % len(players)]
     # setting placements to the turn so that they don't overlap, eventually will check the legality
     move_data = {
-        "pos": (turn,turn),
+        "pos": (turn,0),
         "rotation": turn,
         "player": current_player
     }
