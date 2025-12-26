@@ -59,6 +59,38 @@ for turn in range(4):
 
     time.sleep(0.5)  # simulate small delay
 
+# now go the other way
+for turn in range(4):
+    print("starting turn")
+
+    resp = requests.get(f"{BASE_URL}/games/{game_id}/current_move").json()
+    curr_player, curr_tile = resp['curr_player'], resp['curr_tile']
+    print(f"current player: {curr_player}, current tile: {curr_tile}")
+
+    current_player = players[(turn) % len(players)]
+
+    # setting placements to the turn so that they don't overlap, eventually will check the legality
+    move_data = {
+        "pos": (0, turn+1),
+        "rotation": turn,
+        "player": current_player
+    }
+
+    resp = requests.post(f"{BASE_URL}/games/{game_id}/move", json=move_data)
+
+    if resp.status_code == 200:
+        data = resp.json()
+        print(f"Turn {4+turn}: Player {current_player} moved.")
+    else:
+        try:
+            error = resp.json()
+        except Exception:
+            error = {"error": "Invalid JSON", "raw_text": resp.text}
+
+        print(f"Turn {turn+4}: Player {current_player} failed to move:", error)
+
+    time.sleep(0.5)  # simulate small delay
+
 # get the final game
 draw_successful = requests.get(f"{BASE_URL}/games/{game_id}/draw").json()["img_saved"]
 print(f"draw succesful? {draw_successful}")

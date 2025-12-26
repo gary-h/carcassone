@@ -132,7 +132,7 @@ class GameInstance:
 
         # check all adjacent tiles
 
-        adjacents = [(1,0), (-1,0), (1,0), (-1, 0)]
+        adjacents = [(1,0), (-1,0), (0, 1), (0, -1)]
         spaces_to_check =  [tuple(a + b for a, b in zip(tup, pos)) for tup in adjacents]
 
         empty = True
@@ -143,7 +143,7 @@ class GameInstance:
 
         if empty == True and self.turn > 0:
             return False
-            
+
         return True
 
     def get_legal_placements(self, tile: TileInstance):
