@@ -7,9 +7,9 @@ from pydantic import BaseModel
 router = APIRouter()
 
 class Move(BaseModel):
-    tile_name: str
     pos: tuple[int, int]
     rotation: int = 0
+    player: str
 
 
 @router.post("/create")
@@ -25,12 +25,13 @@ def join_game(game_id: str):
     player_id = game_store.add_player(game_id)
     return {"player_id": player_id, "game": game_id}
 
-@router.get("/{game_id}")
-def get_game(game_id: str):
+@router.get("/{game_id}/current_move")
+def get_current_move(game_id: str):
     game = game_store.get_game(game_id)
     if game is None:
         raise HTTPException(404, "Game not found")
-    return {'game_id': game}
+    curr_tile, curr_player = game.get_current_move()
+    return {'curr_player': curr_player, 'curr_tile': curr_tile}
 
 @router.get("/{game_id}/draw")
 def draw_game(game_id: str):
@@ -49,8 +50,8 @@ def place_tile(game_id: str, move: Move):
 
     game.place_tile(
         pos=tuple(move.pos),
-        tile_name=move.tile_name,
-        rotation=move.rotation
+        rotation=move.rotation,
+        player = move.player
     )
 
     return {"success": True}

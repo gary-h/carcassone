@@ -5,7 +5,6 @@ from pathlib import Path
 
 BASE_URL = "https://viviana-unfeminine-bedazzlingly.ngrok-free.dev"
 
-
 # 1. Create a game
 resp = requests.post(f"{BASE_URL}/games/create")
 print("Create response status:", resp.status_code)
@@ -36,19 +35,24 @@ predefined_tile_moves = ["city_cap_with_straight", "city_cap_with_straight", "se
 
 for turn in range(4):
     print("starting turn")
-    current_player = players[turn % len(players)]
+
+    resp = requests.get(f"{BASE_URL}/games/{game_id}/current_move").json()
+    curr_player, curr_tile = resp['curr_player'], resp['curr_tile']
+    print(f"current player: {curr_player}, current tile: {curr_tile}")
+
+    current_player = players[(turn) % len(players)]
     # setting placements to the turn so that they don't overlap, eventually will check the legality
     move_data = {
-        "tile_name": predefined_tile_moves[turn],
         "pos": (turn,turn),
-        "rotation": 0
+        "rotation": turn,
+        "player": current_player
     }
 
     resp = requests.post(f"{BASE_URL}/games/{game_id}/move", json=move_data)
 
     if resp.status_code == 200:
         data = resp.json()
-        print(f"Turn {turn+1}: Player {current_player} moved.")
+        print(f"Turn {turn}: Player {current_player} moved.")
     else:
         try:
             error = resp.json()

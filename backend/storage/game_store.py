@@ -3,6 +3,7 @@ from typing import Dict, Tuple, Optional, Set
 from uuid import uuid4
 from PIL import Image
 from pathlib import Path
+import random
 
 OPPOSITE = {
     "N": "S",
@@ -29,7 +30,6 @@ class TileInstance:
             file_name=self.file_name
         )
 
-
 # -----------------------------
 # Game instance
 # -----------------------------
@@ -43,33 +43,35 @@ class GameInstance:
     def __init__(self, tile_img_directory):
         self.board: Dict[Tuple[int, int], TileInstance] = {}
         self.players = []
-        self.move_history = []
         self.turn = 0
         self.tile_images = {}
-        self.tile_size = None
-
+        self.tile_size = (100,100)
+        self.deck = []
 
         tile_dir = Path(tile_img_directory)
-        print(tile_dir)
-        print("!!!")
         for tile_path in tile_dir.glob("*.png"):
             print(tile_path)
             tile_id = tile_path.stem  # filename without extension
             img = Image.open(tile_path).convert("RGBA")
+
+            # Resize while keeping aspect ratio
+            img.thumbnail(self.tile_size, Image.LANCZOS)
             self.tile_images[tile_id] = img
 
-            if self.tile_size is None:
-                self.tile_size = img.size  # (width, height)
+            # add this to the deck
+            self.deck.append(tile_id)
 
+        random.shuffle(self.deck)
 
     # ---------- Board queries ----------
 
     def get_tile(self, pos: Tuple[int, int]) -> Optional[TileInstance]:
         return self.board.get(pos)
 
-    def append_move(self, move):
-        self.move_history.append(move)
-        return
+    def get_current_move(self):
+        curr_tile = self.deck[-1]
+        curr_player = self.players[self.turn % len(self.players)]
+        return curr_tile, curr_player
 
     def increment_turn(self):
         self.turn += 1
@@ -94,11 +96,8 @@ class GameInstance:
         return candidates
 
     def draw(self):
-
         if not self.board:
-            # Return an empty canvas or None
-            return Image.new("RGBA", (tile_size, tile_size), (0,0,0,0))
-
+            return Image.new("RGBA", (self.tile_size[0], self.tile_size[1]), (0,0,0,0))
 
         rows = [r for r, _ in self.board.keys()]
         cols = [c for _, c in self.board.keys()]
@@ -112,26 +111,24 @@ class GameInstance:
         for (r, c), tile in self.board.items():
             if tile is None:
                 continue
-            tile_img = self.tile_images[tile.file_name]  # assume TileInstance has tile_id
+            tile_img = self.tile_images[tile.file_name]
+
+            # rotate tile according to tile.rotation
+            if hasattr(tile, "rotation") and tile.rotation:
+                tile_img = tile_img.rotate(tile.rotation * 90, expand=True)
+
             x = (c - min_col) * self.tile_size[0]
             y = (r - min_row) * self.tile_size[1]
             canvas.paste(tile_img, (x, y), tile_img)
 
         return canvas
 
-    # ---------- Placement logic ----------
-
     def fits(self, pos: Tuple[int, int], tile: TileInstance) -> bool:
         """
         Check if a tile fits legally at position `pos`
         by matching edges with neighbors.
         """
-        x, y = pos
-        for d, (dx, dy) in DIRS.items():
-            neighbor = self.board.get((x + dx, y + dy))
-            if neighbor:
-                if tile.edges[d] != neighbor.edges[OPPOSITE[d]]:
-                    return False
+        # TO DO
         return True
 
     def legal_placements(self, tile: TileInstance):
@@ -147,19 +144,25 @@ class GameInstance:
         return placements
 
     #def place_tile(self, pos: Tuple[int, int], tile: TileInstance):
-    def place_tile(self, pos: Tuple[int, int], tile_name: str, rotation: int):
+    def place_tile(self, pos: Tuple[int, int], rotation: int, player: str):
         """
         Place a tile on the board (assumes legality already checked).
         """
-        new_tile = TileInstance(rotation = rotation, file_name = tile_name)
+        new_tile = TileInstance(rotation = rotation, file_name = self.deck[-1])
 
+        # TO DO: should actually not go through with the turn, just testing for now
         if pos in self.board:
             raise ValueError("Position already occupied")
+
+        if player != self.players[self.turn % len(self.players)]:
+            raise ValueError("Not this player's turn")
 
         if not self.fits(pos, new_tile):
             raise ValueError("Illegal placement")
 
         self.board[pos] = new_tile
+        self.deck.pop()
+        self.turn += 1
 
     # ---------- Debug ----------
 
