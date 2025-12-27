@@ -3,7 +3,8 @@ import time
 from PIL import Image
 from pathlib import Path
 
-BASE_URL = "https://viviana-unfeminine-bedazzlingly.ngrok-free.dev"
+BASE_URL = "http://0.0.0.0:8000"
+#BASE_URL = "https://viviana-unfeminine-bedazzlingly.ngrok-free.dev"
 
 resp = requests.post(f"{BASE_URL}/games/create")
 print("Create response status:", resp.status_code)
@@ -28,7 +29,7 @@ print(f"Players joined: {players}")
 
 # Simple loop of 4 moves
 
-
+rotation_index = 0
 for turn in range(4):
     print("starting turn")
 
@@ -40,56 +41,61 @@ for turn in range(4):
     # setting placements to the turn so that they don't overlap, eventually will check the legality
     move_data = {
         "pos": (turn,0),
-        "rotation": turn,
+        "rotation": turn + rotation_index,
         "player": current_player
     }
 
     resp = requests.post(f"{BASE_URL}/games/{game_id}/move", json=move_data)
 
-    if resp.status_code == 200:
-        data = resp.json()
-        print(f"Turn {turn}: Player {current_player} moved.")
-    else:
-        try:
-            error = resp.json()
-        except Exception:
-            error = {"error": "Invalid JSON", "raw_text": resp.text}
+    while resp.status_code != 200:
+        error = {"error": "Invalid JSON", "raw_text": resp.text}
+        print(f"Turn {turn}: Player {current_player} failed to move:", error)
+        rotation_index += 1
 
-        print(f"Turn {turn+1}: Player {current_player} failed to move:", error)
+        move_data = {
+        "pos": (turn,0),
+        "rotation": turn + rotation_index,
+        "player": current_player
+        }
 
-    time.sleep(0.5)  # simulate small delay
+        resp = requests.post(f"{BASE_URL}/games/{game_id}/move", json=move_data)
+        time.sleep(0.2)
+    
+    print(f"Turn {turn}: Player {current_player} moved.")
+
+    time.sleep(1)  # simulate small delay
 
 # now go the other way
-for turn in range(4):
-    print("starting turn")
+# for turn in range(4):
+#     print("starting turn")
 
-    resp = requests.get(f"{BASE_URL}/games/{game_id}/current_move").json()
-    curr_player, curr_tile = resp['curr_player'], resp['curr_tile']
-    print(f"current player: {curr_player}, current tile: {curr_tile}")
+#     resp = requests.get(f"{BASE_URL}/games/{game_id}/current_move").json()
+#     curr_player, curr_tile = resp['curr_player'], resp['curr_tile']
+#     print(f"current player: {curr_player}, current tile: {curr_tile}")
 
-    current_player = players[(turn) % len(players)]
+#     current_player = players[(turn) % len(players)]
 
-    # setting placements to the turn so that they don't overlap, eventually will check the legality
-    move_data = {
-        "pos": (0, turn+1),
-        "rotation": turn,
-        "player": current_player
-    }
+#     # setting placements to the turn so that they don't overlap, eventually will check the legality
+#     move_data = {
+#         "pos": (0, turn+1),
+#         "rotation": turn,
+#         "player": current_player
+#     }
 
-    resp = requests.post(f"{BASE_URL}/games/{game_id}/move", json=move_data)
+#     resp = requests.post(f"{BASE_URL}/games/{game_id}/move", json=move_data)
 
-    if resp.status_code == 200:
-        data = resp.json()
-        print(f"Turn {4+turn}: Player {current_player} moved.")
-    else:
-        try:
-            error = resp.json()
-        except Exception:
-            error = {"error": "Invalid JSON", "raw_text": resp.text}
+#     if resp.status_code == 200:
+#         data = resp.json()
+#         print(f"Turn {4+turn}: Player {current_player} moved.")
+#     else:
+#         try:
+#             error = resp.json()
+#         except Exception:
+#             error = {"error": "Invalid JSON", "raw_text": resp.text}
 
-        print(f"Turn {turn+4}: Player {current_player} failed to move:", error)
+#         print(f"Turn {turn+4}: Player {current_player} failed to move:", error)
 
-    time.sleep(0.5)  # simulate small delay
+#     time.sleep(0.5)  # simulate small delay
 
 # get the final game
 draw_successful = requests.get(f"{BASE_URL}/games/{game_id}/draw").json()["img_saved"]

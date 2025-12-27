@@ -4,6 +4,7 @@ from uuid import uuid4
 from PIL import Image
 from pathlib import Path
 import random
+import numpy as np
 
 OPPOSITE = {
     "N": "S",
@@ -40,17 +41,18 @@ class GameInstance:
     Board coordinates are integer grid positions (x, y).
     """
 
-    def __init__(self, tile_img_directory):
+    def __init__(self, tile_img_directory, feature_map_directory):
         self.board: Dict[Tuple[int, int], TileInstance] = {}
         self.players = []
         self.turn = 0
         self.tile_images = {}
+        self.feature_map_images = {}
         self.tile_size = (100,100) # should allow to set this automatically later on
         self.deck = []
 
+        # add all images to a dictionary with key = tile name
         tile_dir = Path(tile_img_directory)
         for tile_path in tile_dir.glob("*.png"):
-            print(tile_path)
             tile_id = tile_path.stem  # filename without extension
             img = Image.open(tile_path).convert("RGBA")
 
@@ -60,6 +62,17 @@ class GameInstance:
 
             # add this to the deck
             self.deck.append(tile_id)
+
+        # same thing, but for the feature map images
+        tile_dir = Path(feature_map_directory)
+        for tile_path in tile_dir.glob("*.png"):
+            tile_id = tile_path.stem  # filename without extension
+            tile_id = tile_id[len("_feature_map_"):] # get rid of the prefix
+            img = Image.open(tile_path).convert("RGBA")
+
+            # Resize while keeping aspect ratio
+            img.thumbnail(self.tile_size, Image.LANCZOS)
+            self.feature_map_images[tile_id] = img
 
         random.shuffle(self.deck)
 
@@ -72,10 +85,6 @@ class GameInstance:
         curr_tile = self.deck[-1]
         curr_player = self.players[self.turn % len(self.players)]
         return curr_tile, curr_player
-
-    def increment_turn(self):
-        self.turn += 1
-        return
 
     def occupied_positions(self) -> Set[Tuple[int, int]]:
         return set(self.board.keys())
@@ -119,29 +128,76 @@ class GameInstance:
 
             x = (c - min_col) * self.tile_size[0]
             y = (r - min_row) * self.tile_size[1]
-            canvas.paste(tile_img, (x, y), tile_img)
+            canvas.paste(tile_img, (x,y), tile_img)
 
         return canvas
+
+    def check_borders(self, new_tile: TileInstance, tile_to_check: TileInstance, relative_loc: Tuple[int, int]) -> bool:
+        img_a = self.feature_map_images[new_tile.file_name]
+        img_a = img_a.rotate(new_tile.rotation * 90, expand=True)
+        img_b = self.feature_map_images[tile_to_check.file_name]
+        img_b = img_b.rotate(tile_to_check.rotation * 90, expand=True)
+
+        img_a, img_b = np.asarray(img_a), np.asarray(img_b)
+
+        threshold = 0.6
+
+        h, w = img_a.shape[:2]
+
+        dr, dc = relative_loc
+
+        if (dr, dc) == (0, 1):          # new tile is RIGHT of existing
+            edge_b = img_b[:, 0]       # left edge of new
+            edge_a = img_a[:, -1]      # right edge of existing
+
+        elif (dr, dc) == (0, -1):       # new tile is LEFT of existing
+            edge_b = img_b[:, -1]
+            edge_a = img_a[:, 0]
+
+        elif (dr, dc) == (1, 0):        # new tile is BELOW existing
+            edge_b = img_b[0, :]
+            edge_a = img_a[-1, :]
+
+        elif (dr, dc) == (-1, 0):       # new tile is ABOVE existing
+            edge_b = img_b[-1, :]
+            edge_a = img_a[0, :]
+
+        else:
+            raise ValueError(f"Invalid relative_loc: {relative_loc}")
+
+        # pixel-wise comparison
+
+        min_len = min(len(edge_a), len(edge_b))
+        edge_a = edge_a[:min_len]
+        edge_b = edge_b[:min_len]
+
+        matches = np.all(edge_a == edge_b, axis=-1)
+        match_ratio = matches.mean()
+
+        return match_ratio >= threshold
+
 
     def check_placement(self, pos: Tuple[int, int], tile: TileInstance) -> bool:
         """
         Check if a tile fits legally at position `pos`
         by matching edges with neighbors.
         """
-        
 
         # check all adjacent tiles
-
         adjacents = [(1,0), (-1,0), (0, 1), (0, -1)]
-        spaces_to_check =  [tuple(a + b for a, b in zip(tup, pos)) for tup in adjacents]
 
         empty = True
-        for loc in spaces_to_check:
-            # check edges
+
+        for d in adjacents:
+            loc = (pos[0] + d[0], pos[1] + d[1])
+
             if loc in self.board:
                 empty = False
 
-        if empty == True and self.turn > 0:
+                if not self.check_borders(tile, self.board[loc], d):
+                    return False
+
+        if empty and self.turn > 0:
             return False
 
         return True
@@ -170,7 +226,7 @@ class GameInstance:
         elif player != self.players[self.turn % len(self.players)]:
             raise ValueError("Not this player's turn")
 
-        elif not self.check_placement(pos, new_tile):
+        elif self.check_placement(pos, new_tile) == False:
             raise ValueError("Illegal placement")
 
         else:
@@ -189,7 +245,7 @@ class GameStore:
 
     def create_game(self):
         game_id = uuid4().hex
-        self.games[game_id] = GameInstance(tile_img_directory = "assets/tiles/")
+        self.games[game_id] = GameInstance(tile_img_directory = "assets/tiles/", feature_map_directory= "assets/feature_maps/")
         return game_id
 
     def get_game(self, game_id):
